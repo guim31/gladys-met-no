@@ -30,6 +30,13 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+The integration stores nothing on disk: `/data` stays empty, and the forecasts
+live in memory only. It holds no secret (MET Norway needs no key) and makes
+one kind of outgoing request, HTTPS to `api.met.no`, carrying the coordinates
+of the houses of Gladys (rounded to 4 decimals) and the optional altitude. It
+reads the houses through the Gladys host API (`location: true`) and opens no
+port.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and the MET Norway API.
