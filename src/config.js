@@ -11,8 +11,9 @@
 // -----------------------------------------------------------------------------
 
 // Language of the texts the integration writes itself (scene variables and
-// outputs). 'auto' follows the language of the last weather request of the
-// core. The others are the languages of the Gladys interface.
+// outputs), French by default (the maintainer's choice). 'auto' follows the
+// language of the last weather request of the core. The others are the
+// languages of the Gladys interface.
 const LANGUAGE_CHOICES = ['auto', 'en', 'fr', 'de', 'es'];
 
 // Units of the scene variables and outputs. 'auto' follows the unit system of
@@ -26,7 +27,7 @@ const ALTITUDE_MAX = 9000;
 
 const DEFAULT_CONFIG = Object.freeze({
   altitude: null,
-  language: 'auto',
+  language: 'fr',
   units: 'auto',
 });
 

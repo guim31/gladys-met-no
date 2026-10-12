@@ -23,8 +23,8 @@ the notes of the version's GitHub Release.
 - Scene actions "Get the precipitation of the next hour" and "Get the
   forecast of the day" (today or tomorrow: sky, minimum and maximum,
   precipitation, wind, summary).
-- Optional altitude for houses in the mountains, and the language and units
-  of the scene texts.
+- Optional altitude for houses in the mountains, and the language (French by
+  default) and units of the scene texts.
 - A "Test MET Norway" button showing the current temperature of your first
   house.
 - Refreshes about every 30 minutes, as MET Norway's terms of service ask:

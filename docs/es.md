@@ -70,8 +70,8 @@ Nada es obligatorio.
   del tiempo sigue siempre la preferencia de cada usuario.
 - **Idioma de los textos de escena** — el idioma de las frases que la
   integración escribe en las variables de escena («Lluvia moderada prevista
-  dentro de 35 minutos.»): inglés, francés, alemán o español.
-  **Automático** sigue el idioma de su Gladys.
+  dentro de 35 minutos.»): inglés, francés, alemán o español. Francés por
+  defecto; **Automático** sigue el idioma de su Gladys.
 
 ## Frecuencia de actualización y condiciones de MET Norway
 

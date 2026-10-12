@@ -68,8 +68,8 @@ Nothing is mandatory.
   preference of each user.
 - **Language of the scene texts** — the language of the sentences the
   integration writes in scene variables ("Moderate rain expected in 35
-  minutes."): English, French, German or Spanish. **Automatic** follows the
-  language of your Gladys.
+  minutes."): English, French, German or Spanish. French by default;
+  **Automatic** follows the language of your Gladys.
 
 ## Refresh rate and MET Norway's terms
 

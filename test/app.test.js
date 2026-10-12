@@ -111,7 +111,10 @@ test('a refused User-Agent (403) shows in the status', async () => {
 });
 
 test('the scene actions answer in the language and the units of the last request', async () => {
-  const { gladys } = await start({ houses: [HOUSES.toulouse, HOUSES.oslo] });
+  const { gladys } = await start({
+    houses: [HOUSES.toulouse, HOUSES.oslo],
+    config: { language: 'auto' },
+  });
   await gladys.fake.weatherGet({
     latitude: HOUSES.oslo.latitude,
     longitude: HOUSES.oslo.longitude,

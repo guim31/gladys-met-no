@@ -71,8 +71,8 @@ Nichts ist Pflicht.
   Wetter-Widget folgt immer der Einstellung jedes Benutzers.
 - **Sprache der Szenentexte** — die Sprache der Sätze, die die Integration in
   Szenenvariablen schreibt („Mäßiger Regen in 35 Minuten erwartet.“):
-  Englisch, Französisch, Deutsch oder Spanisch. **Automatisch** folgt der
-  Sprache deines Gladys.
+  Englisch, Französisch, Deutsch oder Spanisch. Standardmäßig Französisch;
+  **Automatisch** folgt der Sprache deines Gladys.
 
 ## Aktualisierung und Bedingungen von MET Norway
 

@@ -140,7 +140,7 @@
         "es": "Idioma de las frases que la integración pone en las variables de escena. Automático sigue el idioma de su Gladys."
       },
       "required": false,
-      "default": "auto",
+      "default": "fr",
       "options": [
         {
           "value": "auto",

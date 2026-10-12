@@ -71,8 +71,8 @@ Rien n'est obligatoire.
   météo, lui, suit toujours la préférence de chaque utilisateur.
 - **Langue des textes de scène** — la langue des phrases que l'intégration
   écrit dans les variables de scène (« Pluie modérée attendue dans 35
-  minutes. ») : anglais, français, allemand ou espagnol. **Automatique** suit
-  la langue de votre Gladys.
+  minutes. ») : anglais, français, allemand ou espagnol. Français par défaut ;
+  **Automatique** suit la langue de votre Gladys.
 
 ## Fréquence de mise à jour et conditions de MET Norway
 
