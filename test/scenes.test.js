@@ -1,93 +1,257 @@
+// -----------------------------------------------------------------------------
+// The next hour (next-hour.js), the trigger that announces precipitation
+// (scene-triggers.js) and the two scene actions (scene-actions.js), on the
+// real responses — dry Toulouse, wet Sydney, Nordic Oslo — and on staged
+// showers.
+// -----------------------------------------------------------------------------
+
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
-import { DEVICE_BLUEPRINTS } from '../src/devices/index.js';
-import { MOTION_DETECTED_TRIGGER, motionSensor } from '../src/devices/motionSensor.js';
-import { SCENE_ACTIONS } from '../src/scenes.js';
-import { normalizeConfig } from '../src/config.js';
+import { parseForecast } from '../src/forecast.js';
+import { isPrecipitationAnnounced, readNextHour } from '../src/next-hour.js';
+import { dayForecast, precipitationNextHour } from '../src/scene-actions.js';
+import { COOLDOWN_MS, createPrecipitationWatcher } from '../src/scene-triggers.js';
+import { HOUR_MS } from '../src/time.js';
+import {
+  FIXTURE_NOW,
+  HOUSES,
+  forecastOf,
+  loadFixture,
+  manualClock,
+  silentLogger,
+  withNextHours,
+} from './helpers/fixtures.js';
 
-const manifest = JSON.parse(
-  await readFile(new URL('../gladys-assistant-integration.json', import.meta.url), 'utf8'),
-);
-const config = normalizeConfig();
+const MINUTE = 60 * 1000;
 
-const declarationOf = (list, key) => manifest[list].find((entry) => entry.key === key);
-const keysOf = (list) => (list ?? []).map((entry) => entry.key);
-const deviceIdOf = (gladys, key) =>
-  DEVICE_BLUEPRINTS.find((bp) => bp.key === key).deviceExternalId(gladys);
+/**
+ * @param {object} changes - withNextHours() changes on the Toulouse response.
+ * @returns {object} The forecast.
+ */
+function toulouseWith(changes) {
+  return parseForecast(withNextHours(loadFixture('real-toulouse.json'), changes));
+}
 
-// Let the async interval callback run to completion.
-const flush = () => new Promise((resolve) => setImmediate(resolve));
-
-test('the motion sensor fires one motion_detected event per detection, none on the clear', async (t) => {
-  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
-  const gladys = createFakeGladys();
-  const stopPush = motionSensor.startPush(gladys, config);
-  try {
-    t.mock.timers.tick(60_000);
-    await flush();
-    assert.equal(gladys.fake.sceneEvents.length, 1, 'one detection, one event');
-    assert.equal(gladys.fake.sceneEvents[0].key, MOTION_DETECTED_TRIGGER);
-    assert.equal(gladys.fake.states.at(-1).state, 1, 'the state is still published');
-
-    t.mock.timers.tick(10_000);
-    await flush();
-    assert.equal(gladys.fake.states.at(-1).state, 0, 'the detection is cleared');
-    assert.equal(gladys.fake.sceneEvents.length, 1, 'the clear fires no event');
-  } finally {
-    stopPush();
-  }
+test('dry Toulouse: nothing within the hour', () => {
+  const reading = readNextHour(forecastOf('real-toulouse.json'), FIXTURE_NOW);
+  assert.equal(reading.available, true);
+  assert.equal(reading.minutesUntil, null);
 });
 
-test('motion_detected data only carries keys the trigger declares', async (t) => {
-  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
-  const gladys = createFakeGladys();
-  const stopPush = motionSensor.startPush(gladys, config);
-  try {
-    t.mock.timers.tick(60_000);
-    await flush();
-  } finally {
-    stopPush();
-  }
-  const [{ data }] = gladys.fake.sceneEvents;
-  const trigger = declarationOf('scene_triggers', MOTION_DETECTED_TRIGGER);
-  // The core keeps the `fields` keys (filters) and the `variables` keys
-  // (exposed to the scene): any other key would be silently dropped.
-  const declared = [...keysOf(trigger.fields), ...keysOf(trigger.variables)];
-  for (const [key, value] of Object.entries(data)) {
-    assert.ok(declared.includes(key), `data.${key} is not declared, the core would drop it`);
-    assert.ok(value === null || typeof value !== 'object', `data.${key} must be a primitive`);
-  }
-  // A `"source": "devices"` filter stores a device external_id.
-  assert.equal(data.device, deviceIdOf(gladys, 'motion-sensor'));
-  const targets = trigger.fields.find((field) => field.key === 'target').options;
-  assert.ok(
-    targets.some((option) => option.value === data.target),
-    `data.target "${data.target}" must be one of the filter options`,
+test('wet Sydney: heavy rain now', () => {
+  const reading = readNextHour(forecastOf('real-sydney.json'), FIXTURE_NOW);
+  assert.equal(reading.available, true);
+  assert.equal(reading.wetNow, true);
+  assert.equal(reading.minutesUntil, 0);
+  assert.equal(reading.type, 'rain');
+  assert.equal(reading.intensity, 'heavy', 'heavyrain: MET says heavy');
+  assert.equal(reading.amount, 1.6);
+  assert.equal(reading.probability, null, 'no probability outside the Nordic countries');
+});
+
+test('rain in the next hour starts at the next full hour', () => {
+  const forecast = toulouseWith({
+    '2026-10-12T16:00:00Z': {
+      symbol: 'lightrainshowersandthunder_day',
+      amount: 0.7,
+      probability: 60,
+    },
+  });
+  const reading = readNextHour(forecast, FIXTURE_NOW);
+  assert.equal(reading.minutesUntil, 35);
+  assert.equal(reading.type, 'rain');
+  assert.equal(reading.intensity, 'light');
+  assert.equal(reading.thunder, true);
+  assert.equal(reading.probability, 60);
+});
+
+test('what falls: the symbol, else the temperature; the intensity: MET, else the amount', () => {
+  const sleet = toulouseWith({ '2026-10-12T15:00:00Z': { symbol: 'sleet', amount: 1 } });
+  assert.deepEqual(
+    [readNextHour(sleet, FIXTURE_NOW).type, readNextHour(sleet, FIXTURE_NOW).intensity],
+    ['sleet', 'moderate'],
+  );
+  const trace = toulouseWith({ '2026-10-12T15:00:00Z': { symbol: 'cloudy', amount: 8 } });
+  assert.deepEqual(
+    [readNextHour(trace, FIXTURE_NOW).type, readNextHour(trace, FIXTURE_NOW).intensity],
+    ['rain', 'heavy'],
+  );
+  const below = toulouseWith({ '2026-10-12T15:00:00Z': { symbol: 'cloudy', amount: 0.05 } });
+  assert.equal(readNextHour(below, FIXTURE_NOW).minutesUntil, null, 'under 0.1 mm is dry');
+});
+
+test('no hourly step covering now: not available, never "dry"', () => {
+  const forecast = forecastOf('real-toulouse.json');
+  assert.deepEqual(readNextHour(forecast, FIXTURE_NOW + 5 * 24 * HOUR_MS), { available: false });
+  assert.deepEqual(readNextHour(forecast, FIXTURE_NOW - 2 * HOUR_MS), { available: false });
+});
+
+test('only a dry → wet transition is announced, never the first reading', () => {
+  const dry = { available: true, minutesUntil: null };
+  const wet = { available: true, minutesUntil: 20 };
+  assert.equal(isPrecipitationAnnounced(null, wet), false);
+  assert.equal(isPrecipitationAnnounced(dry, wet), true);
+  assert.equal(isPrecipitationAnnounced(wet, wet), false);
+  assert.equal(isPrecipitationAnnounced({ available: false }, wet), false);
+  assert.equal(isPrecipitationAnnounced(dry, { available: false }), false);
+});
+
+test('the trigger fires once when rain comes into the hour, with its variables', async () => {
+  const now = manualClock(FIXTURE_NOW);
+  const events = [];
+  const watcher = createPrecipitationWatcher({
+    publish: async (key, data) => events.push({ key, data }),
+    getLanguage: () => 'fr',
+    getUnits: () => 'metric',
+    logger: silentLogger(),
+    now,
+  });
+  // Rain forecast from 17:00 UTC: not within the hour at 15:25.
+  const forecast = toulouseWith({
+    '2026-10-12T17:00:00Z': { symbol: 'rain', amount: 3.1 },
+  });
+  assert.equal(await watcher.observe(HOUSES.toulouse, forecast), null, 'baseline');
+  now.advance(30 * MINUTE);
+  assert.equal(await watcher.observe(HOUSES.toulouse, forecast), null, '15:55: still dry');
+  // 16:25: the same forecast (a 304), but 17:00 is now within the hour.
+  now.advance(30 * MINUTE);
+  const data = await watcher.observe(HOUSES.toulouse, forecast);
+  assert.deepEqual(events, [{ key: 'precipitation_expected', data }]);
+  assert.deepEqual(data, {
+    house: 'maison',
+    house_name: 'Maison',
+    summary: 'Pluie modérée attendue dans 35 minutes.',
+    minutes_until: 35,
+    precipitation_type: 'rain',
+    intensity: 'moderate',
+    thunder: false,
+    precipitation: 3.1,
+  });
+  now.advance(30 * MINUTE);
+  assert.equal(await watcher.observe(HOUSES.toulouse, forecast), null, 'still wet: no repeat');
+});
+
+test('a shower that vanishes and comes back within the hour fires once', async () => {
+  const now = manualClock(FIXTURE_NOW);
+  const events = [];
+  const watcher = createPrecipitationWatcher({
+    publish: async (key, data) => events.push(data),
+    getLanguage: () => 'en',
+    getUnits: () => 'us',
+    logger: silentLogger(),
+    now,
+  });
+  const dry = forecastOf('real-toulouse.json');
+  const wet = toulouseWith({ '2026-10-12T16:00:00Z': { symbol: 'heavyrain', amount: 9.5 } });
+  await watcher.observe(HOUSES.toulouse, dry);
+  await watcher.observe(HOUSES.toulouse, wet);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].precipitation, 0.37, 'inches');
+  assert.equal(events[0].summary, 'Heavy rain expected in 35 minutes.');
+  now.advance(20 * MINUTE);
+  await watcher.observe(HOUSES.toulouse, dry);
+  await watcher.observe(HOUSES.toulouse, wet);
+  assert.equal(events.length, 1, 'cooldown');
+  now.advance(COOLDOWN_MS);
+  await watcher.observe(HOUSES.toulouse, dry);
+  await watcher.observe(HOUSES.toulouse, wet);
+  assert.equal(events.length, 2);
+});
+
+test('a refused event never breaks the refresh', async () => {
+  const watcher = createPrecipitationWatcher({
+    publish: async () => {
+      throw new Error('429');
+    },
+    getLanguage: () => 'en',
+    getUnits: () => 'metric',
+    logger: silentLogger(),
+    now: () => FIXTURE_NOW,
+  });
+  await watcher.observe(HOUSES.toulouse, forecastOf('real-toulouse.json'));
+  const data = await watcher.observe(
+    HOUSES.toulouse,
+    toulouseWith({ '2026-10-12T15:00:00Z': { symbol: 'lightsnow', amount: 0.3 } }),
+  );
+  assert.equal(data.precipitation_type, 'snow');
+  assert.equal(data.minutes_until, 0);
+});
+
+test('the next-hour action, dry and wet, in the Nordic countries', () => {
+  assert.deepEqual(
+    precipitationNextHour(forecastOf('real-toulouse.json'), {
+      language: 'de',
+      units: 'metric',
+      now: FIXTURE_NOW,
+    }),
+    {
+      available: true,
+      precipitation_expected: false,
+      summary: 'Kein Niederschlag in der nächsten Stunde erwartet.',
+    },
+  );
+  const sydney = precipitationNextHour(forecastOf('real-sydney.json'), {
+    language: 'es',
+    units: 'metric',
+    now: FIXTURE_NOW,
+  });
+  assert.equal(sydney.precipitation_expected, true);
+  assert.equal(sydney.summary, 'Lluvia fuerte en este momento.');
+  assert.equal(sydney.probability, undefined);
+  const oslo = toulouseWith({});
+  assert.equal(
+    precipitationNextHour(oslo, { language: 'en', units: 'metric', now: 0 }).available,
+    false,
   );
 });
 
-test('identify_device signals the chosen device and returns the declared outputs', async () => {
-  const gladys = createFakeGladys();
-  const outputs = await SCENE_ACTIONS.identify_device(gladys, {
-    fields: { device: deviceIdOf(gladys, 'light') },
-    config,
-  });
-  assert.deepEqual(outputs, { signalled: true });
-  const declared = keysOf(declarationOf('scene_actions', 'identify_device').outputs);
-  for (const key of Object.keys(outputs)) {
-    assert.ok(declared.includes(key), `output "${key}" is not declared, the core would drop it`);
-  }
-});
+test('the day action: today and tomorrow, in words and in numbers', () => {
+  const forecast = forecastOf('real-oslo.json');
+  const options = {
+    house: HOUSES.oslo,
+    language: 'en',
+    units: 'metric',
+    timeZone: 'Europe/Oslo',
+    now: FIXTURE_NOW,
+  };
+  const tomorrow = dayForecast(forecast, { ...options, day: 'tomorrow' });
+  assert.equal(tomorrow.available, true);
+  assert.equal(tomorrow.condition, 'rain');
+  assert.equal(tomorrow.condition_name, 'Rain');
+  assert.equal(tomorrow.temperature_min, 3.9);
+  assert.equal(tomorrow.temperature_max, 8.1);
+  assert.equal(tomorrow.precipitation, 10.3);
+  assert.equal(tomorrow.precipitation_probability, 100);
+  assert.equal(tomorrow.wind_gust, 9.6);
+  assert.equal(
+    tomorrow.summary,
+    'Tomorrow: rain, 3.9 to 8.1 °C, 10.3 mm of precipitation (100% chance).',
+  );
+  const french = dayForecast(forecast, { ...options, day: 'tomorrow', language: 'fr' });
+  assert.equal(
+    french.summary,
+    'Demain : pluie, de 3,9 à 8,1 °C, 10,3 mm de précipitations (probabilité 100 %).',
+  );
 
-test('identify_device reports a device that cannot signal itself through its output', async () => {
-  // Not a failure: a scene action is never a condition, the scene author
-  // gates the following actions on the output instead.
-  const gladys = createFakeGladys();
-  const outputs = await SCENE_ACTIONS.identify_device(gladys, {
-    fields: { device: deviceIdOf(gladys, 'weather-station') },
-    config,
+  const today = dayForecast(forecast, { ...options, day: undefined });
+  assert.equal(today.temperature_max, 9.4);
+  assert.match(
+    today.summary,
+    /^Today: partly cloudy, 3.9 to 9.4 °C, no precipitation \(0% chance\)\.$/,
+  );
+
+  const us = dayForecast(forecastOf('real-toulouse.json'), {
+    ...options,
+    house: HOUSES.toulouse,
+    timeZone: 'Europe/Paris',
+    units: 'us',
+    day: 'tomorrow',
   });
-  assert.deepEqual(outputs, { signalled: false });
+  assert.equal(us.temperature_max, 75.9);
+  assert.equal(us.precipitation_probability, undefined, 'none outside the Nordic countries');
+  assert.equal(us.wind_gust, undefined);
+  assert.match(us.summary, /°F, no precipitation\.$/);
+
+  const late = dayForecast(forecast, { ...options, now: FIXTURE_NOW + 30 * 24 * HOUR_MS });
+  assert.deepEqual(late, { available: false, summary: 'No forecast for this day.' });
 });
