@@ -1,0 +1,216 @@
+# MET Norway
+
+El tiempo en Gladys con [MET Norway](https://www.met.no/en), el Instituto
+Meteorológico de Noruega: sus previsiones cubren el mundo entero, son
+gratuitas y no necesitan **ni cuenta ni clave API**. Es también el tiempo que
+Home Assistant instala por defecto.
+
+Weather data from [MET Norway](https://api.met.no/) (datos meteorológicos de
+MET Norway), con licencia
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.es). Esta
+integración es un proyecto de la comunidad, no afiliado a MET Norway.
+
+## Lo que obtiene
+
+- **El widget del tiempo de Gladys y el asistente de chat** usan MET Norway:
+  el tiempo actual (temperatura, sensación térmica, humedad, presión, punto de
+  rocío, viento, nubosidad, índice UV, salida y puesta del sol), las próximas
+  24 horas con la lluvia de cada hora y los próximos 8 días. El día y la noche
+  tienen sus propios iconos. Todo se muestra en **°C, m/s y mm** o en **°F,
+  mph y pulgadas**, según el sistema de unidades de cada usuario de Gladys.
+- **En los países nórdicos** (Noruega, Suecia, Finlandia, Dinamarca, países
+  bálticos), MET Norway da además las **ráfagas** y la **probabilidad de
+  lluvia**: aparecen en el widget y en las escenas.
+- **Desencadenante de escena «Lluvia o nieve prevista en la próxima hora»**.
+- **Acción de escena «Obtener la precipitación de la próxima hora»**.
+- **Acción de escena «Obtener la previsión del día»** (hoy o mañana), con una
+  frase lista para poner en un mensaje.
+
+Ningún widget adicional: el widget del tiempo de Gladys ya muestra todo lo
+que publica MET Norway.
+
+**Sin alertas meteorológicas.** MET Norway solo publica sus alertas
+(MetAlerts) para Noruega: el desencadenante integrado «Alerta meteorológica»
+de Gladys permanece en silencio con esta integración. Para las alertas,
+instale también la integración **Météo France** (vigilancia, Francia) o
+**Pirate Weather** (Estados Unidos, Canadá, Europa).
+
+## Instalación
+
+1. En Gladys, compruebe que su vivienda tiene una ubicación: **Configuración
+   → Viviendas**, e indique la dirección o la posición en el mapa. La
+   integración actualiza el tiempo de cada vivienda que tenga una.
+2. Instale **MET Norway** desde el catálogo de integraciones (o
+   **Integraciones → Instalar desde GitHub**, con la dirección
+   `https://github.com/guim31/gladys-met-no`). Gladys le pide autorizar el
+   acceso a la ubicación de sus viviendas: sirve para vigilar la lluvia de la
+   próxima hora para el desencadenante de escena.
+3. Abra la pestaña **Configuración** y haga clic en **Probar MET Norway**. La
+   respuesta muestra la temperatura actual de su primera vivienda.
+
+Eso es todo: el widget del tiempo de su panel muestra ahora MET Norway. Si
+hay otra integración meteorológica instalada, elija el proveedor en los
+ajustes del widget del tiempo.
+
+Se necesita Gladys 5.2 o posterior.
+
+## Configuración
+
+Nada es obligatorio.
+
+- **Altitud (m)** — déjela vacía: MET Norway usa entonces su modelo de
+  terreno, correcto casi en todas partes. Indique la altitud solo en la
+  montaña, si la temperatura prevista es claramente demasiado cálida o fría
+  para su vivienda (un valle encajado, un chalé muy por encima del pueblo).
+  La altitud se aplica a todas sus viviendas.
+- **Unidades de los valores de escena** — las unidades de las temperaturas, el
+  viento y la precipitación que la integración pone en las variables de
+  escena. **Automático** sigue el sistema de unidades del último usuario que
+  consultó el tiempo; elija **Métrico** o **EE. UU.** para fijarlo. El widget
+  del tiempo sigue siempre la preferencia de cada usuario.
+- **Idioma de los textos de escena** — el idioma de las frases que la
+  integración escribe en las variables de escena («Lluvia moderada prevista
+  dentro de 35 minutos.»): inglés, francés, alemán o español.
+  **Automático** sigue el idioma de su Gladys.
+
+## Frecuencia de actualización y condiciones de MET Norway
+
+MET Norway ofrece su API a condición de que cada aplicación la cuide. La
+integración aplica sus
+[condiciones de uso](https://api.met.no/doc/TermsOfService):
+
+- **una actualización cada 30 minutos aproximadamente**, nunca antes de la
+  hora de caducidad que MET Norway indica con cada previsión, más unos minutos
+  al azar para que las instalaciones de Gladys no llamen todas en el mismo
+  segundo;
+- **una sola llamada por vivienda** (las viviendas en el mismo lugar la
+  comparten), que alimenta todo: el panel, el chat y las escenas. Abrir el
+  panel no cuesta nada: Gladys se sirve de la previsión en memoria;
+- **una solicitud condicional**: si la previsión no ha cambiado, MET Norway
+  responde «nada nuevo» sin volver a enviarla;
+- coordenadas redondeadas a 4 decimales (unos 10 m) y una identificación de la
+  aplicación (`gladys-met-no/<version> github.com/guim31/gladys-met-no`),
+  como exige MET Norway;
+- si MET Norway pide reducir el ritmo (error 429), la integración hace una
+  pausa de 10 minutos, y cada vez más larga si se repite; si rechaza las
+  solicitudes (error 403), espera 6 horas.
+
+Durante una avería, la última previsión se sigue mostrando 3 horas como
+máximo.
+
+## Escenas
+
+La integración añade sus tarjetas al editor de escenas, en la categoría
+**Integraciones**. El campo **Vivienda** propone la lista de sus viviendas.
+
+### Lluvia o nieve prevista en la próxima hora
+
+Desencadenante: inicia la escena cuando la previsión horaria indica
+precipitación durante la hora en curso o la siguiente, donde la actualización
+anterior no indicaba ninguna. Se activa una vez por episodio, como máximo una
+vez por hora y por vivienda, y nunca en la primera actualización tras un
+reinicio.
+
+Filtros opcionales (vacíos: todo vale):
+
+- **Vivienda**;
+- **Precipitación**: lluvia, aguanieve o nieve;
+- **Intensidad**: débil, moderada o fuerte.
+
+Variables utilizables en las acciones siguientes: el nombre de la vivienda,
+el tipo de precipitación (`rain`, `sleet`, `snow`), la intensidad (`light`,
+`moderate`, `heavy`), si hay tormenta, los minutos hasta el inicio (0 si ya
+llueve), la cantidad prevista en esa hora, la probabilidad (solo países
+nórdicos) y un **resumen** listo para enviar, por ejemplo: «Lluvia débil con
+tormenta prevista dentro de 35 minutos.»
+
+### Obtener la precipitación de la próxima hora
+
+Acción: indica a la escena si llega lluvia o nieve en la próxima hora
+(**Precipitación prevista**: sí o no), cuándo, qué, con qué intensidad, y el
+mismo resumen. Deje **Vivienda** vacío para su primera vivienda con
+ubicación. Si ninguna previsión horaria cubre la hora, **Previsión
+disponible** vale no: no concluya que no lloverá.
+
+### Obtener la previsión del día
+
+Acción: lee la previsión de **hoy** (el resto del día) o de **mañana** para
+una vivienda, y devuelve:
+
+- el cielo, como código de Gladys (`clear`, `partly-cloudy`, `rain`,
+  `snow`…) y en palabras («Lluvia»);
+- las temperaturas mínima y máxima;
+- la precipitación del día, y su probabilidad (solo países nórdicos);
+- el viento más fuerte, y la ráfaga más fuerte (solo países nórdicos);
+- un **resumen**, por ejemplo: «Mañana: lluvia, de 8 a 14 °C, 5,2 mm de
+  precipitación.»
+
+## Ejemplos de escenas
+
+- **Recoger la ropa**: desencadenante «Lluvia o nieve prevista en la próxima
+  hora», y luego una notificación con la variable **Resumen**.
+- **El tiempo de la mañana**: a las 7:00, acción «Obtener la previsión del
+  día» (hoy), y luego un mensaje o un anuncio en el altavoz con su
+  **Resumen**.
+- **Riego**: cada tarde, acción «Obtener la previsión del día» (mañana), y
+  luego una condición sobre **Precipitación** para lanzar el riego solo si se
+  prevén menos de 2 mm.
+- **Persianas y toldo**: cuando se levanta el viento, acción «Obtener la
+  precipitación de la próxima hora», y luego recoger el toldo si
+  **Precipitación prevista** es verdadero.
+
+## Límites
+
+- **Sin alertas oficiales** fuera de Noruega (ver más arriba).
+- **La hora es el paso más fino.** Fuera de los países nórdicos, MET Norway
+  no da la lluvia minuto a minuto (Nowcast): el desencadenante anuncia un
+  chubasco con precisión de una hora, no de un minuto. La previsión es horaria
+  durante unos dos días y medio, y luego por tramos de 6 horas hasta 9 días.
+- **Ráfagas y probabilidad de lluvia**: solo en los países nórdicos.
+- **Sin visibilidad**: MET Norway da una fracción de niebla, no una
+  distancia.
+- **El índice UV** es el de cielo despejado (el que muestra Yr): un máximo,
+  más bajo bajo las nubes.
+- **Hoy** solo cubre las horas por venir: la mínima del día es la del resto
+  del día.
+- **Los días** se cortan según la zona horaria de Gladys, para todas las
+  viviendas.
+- La integración necesita Gladys 5.2 o posterior.
+
+## Solución de problemas
+
+- **«Ninguna vivienda de Gladys tiene ubicación»** — indique la ubicación de
+  su vivienda en **Configuración → Viviendas**.
+- **«MET Norway no tiene una previsión utilizable para la ubicación de su
+  vivienda»** — la ubicación no es válida: compruébela en **Configuración →
+  Viviendas**.
+- **«MET Norway pide reducir el ritmo»** — demasiadas solicitudes desde su
+  conexión a Internet (quizá otra aplicación usa la misma API): la integración
+  espera y vuelve a intentarlo sola.
+- **«MET Norway rechaza las solicitudes (HTTP 403)»** — MET Norway ya no
+  acepta la identificación de esta versión: actualice la integración.
+- **«MET Norway no está disponible por ahora»** — Gladys no consigue
+  conectar con `api.met.no`: compruebe su acceso a Internet. La integración
+  vuelve a intentarlo tras 5 minutos, y luego cada vez con menos frecuencia.
+- **La temperatura prevista es incorrecta en la montaña** — indique la
+  **Altitud** en la configuración.
+- **El panel sigue mostrando otro proveedor** — abra los ajustes del widget
+  del tiempo y elija MET Norway.
+- **Logs**: la pestaña **Logs** de la integración muestra cada actualización
+  («Refreshed 1 location(s) of 1 house(s); next refresh in 31 min»).
+
+## Privacidad
+
+Las coordenadas de sus viviendas, redondeadas a unos 10 m, se envían a MET
+Norway para obtener su previsión, y a ningún otro lugar. Sin cuenta, sin
+clave, no se guarda nada en el disco.
+
+## Créditos
+
+Weather data from [MET Norway](https://api.met.no/) (Instituto Meteorológico
+de Noruega), con licencia
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.es): las
+previsiones se convierten al formato meteorológico de Gladys (unidades,
+símbolos, días). Los símbolos meteorológicos siguen la leyenda de
+[metno/weathericons](https://github.com/metno/weathericons). Gracias a MET
+Norway por mantener sus previsiones abiertas a todos.

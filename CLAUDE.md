@@ -16,8 +16,8 @@ its only runtime dependency. It started from the official JavaScript template.
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/pivot.test.js            # one file
+node --test --test-name-pattern "Oslo"    # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
@@ -30,17 +30,30 @@ pushing.
 
 ## Architecture
 
+A **weather** integration (manifest `type: "weather"`): no devices, a provider
+API. Gladys asks for the weather of a house (`onWeatherGet`), the integration
+answers in the pivot format of the core from the forecast it keeps in memory.
+
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only: createApp() then connect()
+src/app.js                        the integration on an injected client: handlers, status, lifecycle
+src/api.js                        the one MET Norway request (User-Agent, If-Modified-Since, error kinds)
+src/forecast.js                   GeoJSON response → slim metric forecast (points sorted by time)
+src/forecast-store.js             cache per location; enforces Expires, 304, 429/403 pauses
+src/scheduler.js                  refresh timer: at Expires, ≥ 30 min, + 0-5 min jitter
+src/pivot.js                      slim forecast → pivot weather (current, 24 hours, 8 days)
+src/daily.js                      days cut at local midnights, precipitation timeline
+src/symbols.js                    the 83 symbol codes → Gladys conditions, day/night variant
+src/sun.js, src/time.js           computed sunrise/sunset (NOAA), local days (TZ)
+src/next-hour.js                  precipitation within the hour (trigger + action)
+src/scene-triggers.js             "precipitation_expected" (dry → wet, baseline, 1 h cooldown)
+src/scene-actions.js              "get_precipitation_next_hour", "get_day_forecast"
+src/houses.js                     the houses of Gladys (getHouses, `location: true`)
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+src/texts.js, src/units.js        texts in en/fr/de/es, metric → us conversions
+gladys-assistant-integration.json manifest: name, config_schema, actions, scene cards, image...
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (en and fr mandatory)
+test/                             node --test, against the SDK's fake Gladys and real API responses
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -67,11 +80,12 @@ test/                             node --test, against the SDK's fake Gladys (in
   catalog `description` holds 10 to 100 characters per language. A field the
   older cores do not know needs a higher `gladys_version` minimum
   (`categories`: 4.86.0; `widgets`, `scene_triggers`, `scene_actions`,
-  `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
+  `type: "provider"`: 5.1.0; `source: "houses"`: 5.2.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in English, French, German and Spanish: action
+  messages, scene texts, manifest texts, and `docs/{en,fr,de,es}.md`, kept in
+  sync (`test/i18n.test.js` checks it).
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -153,11 +167,13 @@ code de ce dépôt. Compléter ce fichier quand un nouveau piège est découvert
 **Widgets, déclencheurs, actions de scène (SDK ≥ 0.14, Gladys ≥ 5.1)**
 
 - **Cibler la dernière version publiée du cœur, pas `master`** : la spec de `master` décrit des
-  fonctions non publiées. Les boutons de widget qui ouvrent un formulaire (#3168, commit 3feb2cf8)
-  sont absents de la 5.1.4 : le bouton s'affiche et n'envoie rien. Vérifier par `git tag --contains`.
+  fonctions non publiées. La dernière version publiée est la **5.2.0** (12/10/2026). Les boutons
+  de widget qui ouvrent un formulaire (#3168, commit 3feb2cf8) étaient absents de la 5.1.4 : le
+  bouton s'affichait et n'envoyait rien. Vérifier par `git tag --contains`.
 
-- Un réglage de widget ne propose en liste que les **appareils** de l'intégration
-  (`source: "devices"`, seule source dynamique).
+- Un réglage de widget, un champ de scène ou d'action ne propose en liste que les **appareils**
+  de l'intégration (`source: "devices"`) ou, **depuis la 5.2.0**, les **maisons** de Gladys
+  (`source: "houses"`, la valeur reçue est le `selector`), ce qui impose `gladys_version >=5.2.0`.
 - Budget du cœur : **8 composants par widget, dont 2 textes au plus**, appliqué **avant** la
   résolution des références ; un contenu amputé reste en cache jusqu'au TTL. Appeler
   `requestWidgetRefresh` à la création d'un appareil. `validateWidgetContent` est exporté pour les
@@ -200,5 +216,56 @@ code de ce dépôt. Compléter ce fichier quand un nouveau piège est découvert
 Tout texte montré à l'utilisateur existe en **`en`, `fr`, `de` et `es`** : manifeste, contenu des widgets, messages,
 noms de fonctionnalités. L'allemand **tutoie** (« du »), l'espagnol **vouvoie** (« usted ») : décision de Guilhem,
 appliquée à ses 21 intégrations. `test/i18n.test.js` doit échouer sur une langue manquante, un texte vide ou trop
-long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store ne publie que `docs/en.md` et `docs/fr.md`
-(`DOCS_LANGUAGES` d'integration-store) : pas de doc de/es.
+long, et sur un « Sie »/« Ihr… » de politesse en allemand. L'indexeur du store publie `docs/en.md` et `docs/fr.md`
+(obligatoires), et aussi `docs/de.md` et `docs/es.md` quand ils existent (`DOCS_OPTIONAL_LANGUAGES` d'integration-store) :
+les quatre docs sont écrites, avec les mêmes sections (vérifié par `test/i18n.test.js`). Attention, le test du « Sie »
+attrape aussi le « sie/Sie » de la 3e personne en début de phrase : reformuler.
+
+## MET Norway (cette intégration)
+
+**API.** `GET https://api.met.no/weatherapi/locationforecast/2.0/complete?lat&lon[&altitude]`,
+GeoJSON (`geometry.coordinates` = [lon, lat, altitude], `properties.timeseries`). Pas horaire
+pendant ~50 à 60 h selon le lieu, puis 6 h jusqu'à J+9/10. Chaque instant : `instant.details`
+(état de l'air) et `next_1_hours` / `next_6_hours` / `next_12_hours` (période qui **commence** à
+cet instant : symbole, précipitations, min/max sur 6 h). Toutes les heures en UTC, unités
+métriques fixes. Réponses réelles du 12/10/2026 dans `test/fixtures/` (voir leur README).
+
+**Conditions d'utilisation, appliquées dans `forecast-store.js`** (aucun appelant ne peut les
+contourner) : `User-Agent` `gladys-met-no/<version> github.com/guim31/gladys-met-no` (version lue
+dans `package.json`, donc suivie par la Release) ; 4 décimales au plus ; jamais d'appel avant
+`Expires` ; après, `If-Modified-Since` = le `Last-Modified` reçu, tel quel (304 sans corps : on
+garde la prévision) ; 429 → pause 10 min doublée jusqu'à 2 h ; 403 → 6 h ; 203 → log. Le planificateur
+ajoute 0 à 5 min au hasard (les CGU demandent d'étaler les appels). Constaté : `Expires` arrive
+12 à 31 min après la requête, d'où le plancher de 30 min.
+
+**Pièges découverts.**
+
+- Hors pays nordiques, **ni rafales, ni probabilités** (pluie, orage), ni percentiles : champs
+  absents, pas nuls. Les sorties de scène correspondantes sont omises, jamais mises à 0.
+- `ultraviolet_index_clear_sky` est l'UV **par ciel clair** (un maximum). Pas de visibilité.
+- `symbol_code` : 41 symboles, 21 avec variantes `_day`/`_night`/`_polartwilight` (83 codes).
+  Deux fautes officielles gardées par l'API : `lightssleetshowersandthunder`,
+  `lightssnowshowersandthunder` (et un espace parasite dans `legend.csv`). `fair` →
+  `partly-cloudy`, comme Home Assistant (pas `clear`).
+- Les derniers instants horaires n'ont **que** `next_1_hours`, le premier instant 6-horaire
+  n'a pas `next_1_hours` : la frise des précipitations (`precipitationTimeline`) prend l'heure
+  tant que l'instant suivant est à +1 h, sinon les 6 h, sans recouvrement.
+- Le dernier jour de la prévision n'est souvent couvert que par un instant de minuit UTC : il
+  est écarté (`buildDays`), sinon il afficherait les extrêmes de quelques heures de nuit.
+- Sans altitude, MET utilise son modèle de terrain (`geometry.coordinates[2]` la renvoie) ; le
+  cœur ne stocke pas l'altitude des maisons, d'où un champ facultatif unique.
+- Pas de lever/coucher du soleil dans Locationforecast : calcul local (`sun.js`) plutôt qu'un
+  appel Sunrise 3.0 par maison et par jour.
+
+**Pièges du cœur 5.2.0 (type weather).**
+
+- `onWeatherGet` reçoit `{ latitude, longitude, language, units }` ; `units` vaut `metric` ou
+  `us`. Le contrat B.18 et le SDK disent : précipitations en **pouces** pour `us`. Mais le widget
+  météo du front 5.2.0 (`WeatherBox.jsx`, `formatRain`) considère les précipitations **toujours
+  en mm** et les divise lui-même par 25,4, alors que le chat (MCP `formatWeather`) les étiquette
+  « in ». L'intégration suit le contrat (pouces, comme `gladys-open-meteo`) : en `us`, le widget
+  affichera des pouces divisés deux fois. Incohérence du cœur à signaler.
+- Une erreur d'`onWeatherGet` (lancée) fait passer le cœur au fournisseur suivant. Le cœur ne
+  transmet ni la maison ni son `selector` à `onWeatherGet`, seulement ses coordonnées.
+- L'ack d'une action, d'une action de scène ou d'une demande météo du faux Gladys du SDK porte
+  l'erreur en **chaîne** (`ack.error`), pas en objet.
