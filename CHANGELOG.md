@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-12
+
 ### Added
 
 - MET Norway weather for Gladys (Gladys 5.2.0 or later): current conditions,
@@ -32,4 +34,5 @@ the notes of the version's GitHub Release.
   Norway asks to slow down.
 - Documentation in English, French, German and Spanish.
 
-[Unreleased]: https://github.com/guim31/gladys-met-no/commits/main
+[Unreleased]: https://github.com/guim31/gladys-met-no/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-met-no/releases/tag/v1.0.0
