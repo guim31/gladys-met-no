@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-13
+
 ### Changed
 
 - Quieter logs: a normal refresh writes nothing any more at the default level.
@@ -45,5 +47,6 @@ the notes of the version's GitHub Release.
   Norway asks to slow down.
 - Documentation in English, French, German and Spanish.
 
-[Unreleased]: https://github.com/guim31/gladys-met-no/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/guim31/gladys-met-no/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/guim31/gladys-met-no/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/guim31/gladys-met-no/releases/tag/v1.0.0

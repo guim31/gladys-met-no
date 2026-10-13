@@ -8,8 +8,8 @@
     "de": "Kostenlose weltweite Vorhersagen von MET Norway, ohne Konto und ohne API-Schlüssel.",
     "es": "Previsiones mundiales gratuitas del Instituto Meteorológico de Noruega, sin cuenta ni clave API."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/guim31/gladys-met-no:1.0.0",
+  "version": "1.0.1",
+  "docker_image": "ghcr.io/guim31/gladys-met-no:1.0.1",
   "gladys_version": ">=5.2.0",
   "cover_image": "https://raw.githubusercontent.com/guim31/gladys-met-no/main/cover.png",
   "categories": ["environment"],

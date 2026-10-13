@@ -1,6 +1,6 @@
 {
   "name": "gladys-met-no",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "MET Norway weather provider for Gladys Assistant: free worldwide forecasts, no API key.",
   "type": "module",
