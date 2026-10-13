@@ -10,6 +10,17 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Changed
+
+- Quieter logs: a normal refresh writes nothing any more at the default level.
+  Set `LOG_LEVEL=debug` to see every refresh again (see Troubleshooting).
+
+### Fixed
+
+- When MET Norway or Gladys stays unreachable, the logs show one warning when
+  the problem starts and one line when it is over, instead of a line at every
+  retry.
+
 ## [1.0.0] - 2026-10-12
 
 ### Added

@@ -26,6 +26,7 @@
 // -----------------------------------------------------------------------------
 
 import { ERROR_KINDS, MetNoError, fetchForecast } from './api.js';
+import { createFailureLog } from './failure-log.js';
 import { parseForecast } from './forecast.js';
 
 // Beyond this, a cached forecast is no longer served when a refresh fails.
@@ -80,6 +81,8 @@ function createForecastStore({
   let blockedKind = null;
   let throttleMs = THROTTLE_FIRST_MS;
   let deprecationLogged = false;
+  // One warning when MET Norway starts failing, one line when it answers again.
+  const failures = createFailureLog(logger);
   let calls = 0;
 
   /**
@@ -112,13 +115,20 @@ function createForecastStore({
       blockedUntil = now() + delay;
       blockedKind = kind;
       throttleMs = Math.min(throttleMs * 2, THROTTLE_MAX_MS);
-      logger.warn(
+      failures.fail(
+        'met',
         `MET Norway throttles the requests (429): pausing ${Math.round(delay / 60000)} min`,
+        { kind },
       );
     } else if (kind === ERROR_KINDS.FORBIDDEN) {
       blockedUntil = now() + FORBIDDEN_BLOCK_MS;
       blockedKind = kind;
-      logger.error('MET Norway refused the requests (403): pausing 6 hours');
+      failures.fail('met', 'MET Norway refused the requests (403): pausing 6 hours', {
+        kind,
+        level: 'error',
+      });
+    } else {
+      failures.fail('met', `MET Norway request failed: ${err.message}`, { kind });
     }
   }
 
@@ -194,6 +204,7 @@ function createForecastStore({
         }
         lastError = null;
         throttleMs = THROTTLE_FIRST_MS;
+        failures.recover('met', 'MET Norway answers again');
         return entry;
       } catch (err) {
         recordFailure(err);
@@ -242,7 +253,8 @@ function createForecastStore({
     } catch (err) {
       if (cached !== null && now() - cached.checkedAt <= STALE_MAX_MS) {
         const minutes = Math.round((now() - cached.checkedAt) / 60000);
-        logger.warn(`Serving a forecast checked ${minutes} min ago: ${err.message}`);
+        // The failure itself was logged once by recordFailure.
+        logger.debug(`Serving a forecast checked ${minutes} min ago: ${err.message}`);
         return { ...cached, stale: true };
       }
       throw err;

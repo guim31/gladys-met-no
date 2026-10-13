@@ -21,6 +21,7 @@
 // -----------------------------------------------------------------------------
 
 import { ERROR_KINDS } from './api.js';
+import { createFailureLog } from './failure-log.js';
 
 const MIN_INTERVAL_MS = 30 * 60 * 1000;
 const JITTER_MS = 5 * 60 * 1000;
@@ -61,6 +62,8 @@ function createScheduler({
   let queued = false;
   let started = false;
   let failedCycles = 0;
+  // Failures that repeat at every cycle are logged once (failure-log.js).
+  const failures = createFailureLog(logger);
 
   /**
    * @description Arm the next cycle.
@@ -135,13 +138,21 @@ function createScheduler({
           for (const house of group) {
             try {
               await onRefreshed(house, entry);
+              failures.recover(
+                `observe:${house.id}`,
+                `Post-refresh handling works again for "${house.name}"`,
+              );
             } catch (err) {
-              logger.warn(`Post-refresh handling failed for "${house.name}": ${err.message}`);
+              failures.fail(
+                `observe:${house.id}`,
+                `Post-refresh handling failed for "${house.name}": ${err.message}`,
+              );
             }
           }
         } catch (err) {
           error = err;
-          logger.warn(`Refresh failed for "${group[0].name}": ${err.message}`);
+          // The store already logged the failure of MET Norway, once.
+          logger.debug(`Refresh failed for "${group[0].name}": ${err.message}`);
           if (err.kind === ERROR_KINDS.THROTTLED || err.kind === ERROR_KINDS.FORBIDDEN) {
             break;
           }
@@ -161,9 +172,11 @@ function createScheduler({
     };
     try {
       await onCycle(summary);
+      failures.recover('end-of-cycle', 'End-of-cycle handling works again');
     } catch (err) {
-      logger.warn(`End-of-cycle handling failed: ${err.message}`);
+      failures.fail('end-of-cycle', `End-of-cycle handling failed: ${err.message}`);
     }
+    failures.recover('cycle', 'Refresh cycles run again');
     schedule(delayMs);
     return summary;
   }
@@ -181,7 +194,7 @@ function createScheduler({
     }
     running = cycle()
       .catch((err) => {
-        logger.warn(`Refresh cycle failed: ${err.message}`);
+        failures.fail('cycle', `Refresh cycle failed: ${err.message}`);
         schedule(RETRY_FIRST_MS);
         return { houses: 0, locations: 0, refreshed: 0, error: err, delayMs: RETRY_FIRST_MS };
       })

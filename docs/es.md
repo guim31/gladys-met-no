@@ -196,8 +196,10 @@ una vivienda, y devuelve:
   **Altitud** en la configuración.
 - **El panel sigue mostrando otro proveedor** — abra los ajustes del widget
   del tiempo y elija MET Norway.
-- **Logs**: la pestaña **Logs** de la integración muestra cada actualización
-  («Refreshed 1 location(s) of 1 house(s); next refresh in 31 min»).
+- **Logs**: la pestaña **Logs** de la integración (o `docker logs` en el
+  host) muestra el arranque, los problemas y el regreso de MET Norway, una vez
+  cada uno, no cada actualización. Inicie el contenedor con `LOG_LEVEL=debug`
+  para ver cada actualización y cada nuevo intento.
 
 ## Privacidad
 

@@ -197,8 +197,10 @@ Action : lit la prévision d'**aujourd'hui** (le reste de la journée) ou de
   dans la configuration.
 - **Le tableau de bord affiche toujours un autre fournisseur** — ouvrez les
   réglages du widget météo et choisissez MET Norway.
-- **Logs** : l'onglet **Logs** de l'intégration montre chaque mise à jour
-  (« Refreshed 1 location(s) of 1 house(s); next refresh in 31 min »).
+- **Logs** : l'onglet **Logs** de l'intégration (ou `docker logs` sur
+  l'hôte) montre le démarrage, les problèmes et le retour de MET Norway, une
+  fois chacun, pas chaque mise à jour. Lancez le conteneur avec
+  `LOG_LEVEL=debug` pour voir chaque mise à jour et chaque nouvel essai.
 
 ## Vie privée
 

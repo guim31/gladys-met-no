@@ -198,8 +198,10 @@ Aktion: liest die Vorhersage für **heute** (den Rest des Tages) oder
   **Höhe** in der Konfiguration ein.
 - **Das Dashboard zeigt weiter einen anderen Anbieter** — öffne die
   Einstellungen des Wetter-Widgets und wähle MET Norway.
-- **Logs**: Der Reiter **Logs** der Integration zeigt jede Aktualisierung
-  („Refreshed 1 location(s) of 1 house(s); next refresh in 31 min“).
+- **Logs**: Der Reiter **Logs** der Integration (oder `docker logs` auf dem
+  Host) zeigt den Start, die Probleme und die Rückkehr von MET Norway, jeweils
+  einmal, nicht jede Aktualisierung. Starte den Container mit
+  `LOG_LEVEL=debug`, um jede Aktualisierung und jeden neuen Versuch zu sehen.
 
 ## Datenschutz
 
