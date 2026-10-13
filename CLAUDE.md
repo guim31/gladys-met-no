@@ -49,6 +49,7 @@ src/next-hour.js                  precipitation within the hour (trigger + actio
 src/scene-triggers.js             "precipitation_expected" (dry → wet, baseline, 1 h cooldown)
 src/scene-actions.js              "get_precipitation_next_hour", "get_day_forecast"
 src/houses.js                     the houses of Gladys (getHouses, `location: true`)
+src/failure-log.js                repeated failures logged once (warn, debug, then info on recovery)
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
 src/texts.js, src/units.js        texts in en/fr/de/es, metric → us conversions
 gladys-assistant-integration.json manifest: name, config_schema, actions, scene cards, image...
@@ -67,6 +68,12 @@ test/                             node --test, against the SDK's fake Gladys and
   manifest `config_schema`, `actions`, widget and scene keys, feature keys.
 - **The container rootfs is read-only.** Write only under `/data`, the one
   writable volume. Never log tokens, passwords or API keys.
+- **Logs.** At `info` (the default), only the lifecycle: start, MET Norway or
+  Gladys lost and back, errors the user can act on, one line per user action.
+  A refresh cycle, a published event, a retry are `debug` (the SDK logger reads
+  `LOG_LEVEL`: debug, info, warn, error, silent). A failure that repeats goes
+  through `src/failure-log.js`: one warning at the first failure, `debug`
+  while it repeats, one `info` when it recovers. `test/logs.test.js` checks it.
 - **Versions belong to the Release workflow** (Actions → Release). Never edit
   `version` in `package.json` or in the manifest, nor the `docker_image` tag,
   by hand — except on the README's hand-pushed tag path, which bumps all three
@@ -122,7 +129,11 @@ code de ce dépôt. Compléter ce fichier quand un nouveau piège est découvert
   `poll_frequency` vaut une valeur de la liste fixe, **en millisecondes** (1000, 2000, 10000,
   15000, 30000, 60000). Le template publie `poll_frequency: 300` sans `should_poll` : c'est faux,
   le cœur répond 400 à la découverte. Pour une cadence hors liste, publier `should_poll: false` et
-  pousser les états depuis le conteneur, en gardant un `onPoll` de repli.
+  pousser les états depuis le conteneur, en gardant un `onPoll` de repli. **Piège du 5.2.0**
+  (GladysAssistant/Gladys#3198, correctif #3199 non publié) : les appareils **déjà créés** sans
+  `should_poll` ne sont **jamais** sondés, même après correction. Ici, sans objet : un fournisseur
+  météo n'a pas d'appareil, les mises à jour viennent du minuteur du conteneur (`scheduler.js`),
+  jamais du polling du cœur ; `test/logs.test.js` vérifie qu'il se relance seul.
 - **`min` et `max` sont NOT NULL** dans `t_device_feature`, y compris pour `text/text` : sans eux,
   « Ajouter à Gladys » échoue en HTTP 422. Mettre 0/0, comme Zigbee2MQTT.
 - Un état publié sur une fonctionnalité **pas encore ajoutée** dans Gladys reçoit un 200 puis est

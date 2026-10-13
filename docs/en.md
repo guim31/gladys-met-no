@@ -187,8 +187,10 @@ for a house, and returns:
   **Altitude** in the configuration.
 - **The dashboard still shows another provider** — open the settings of the
   weather widget and pick MET Norway.
-- **Logs**: the **Logs** tab of the integration shows every refresh
-  ("Refreshed 1 location(s) of 1 house(s); next refresh in 31 min").
+- **Logs**: the **Logs** tab of the integration (or `docker logs` on the
+  host) shows the start, the problems and the return of MET Norway, once
+  each, not every refresh. Start the container with `LOG_LEVEL=debug` to see
+  every refresh and every retry.
 
 ## Privacy
 

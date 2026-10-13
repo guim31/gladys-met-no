@@ -211,6 +211,26 @@ function silentLogger() {
 }
 
 /**
+ * @description A logger that keeps every line, by level.
+ * @returns {object} The logger, with `lines` (`[{ level, message }]`) and
+ * `at(level)` (the messages of one level).
+ * @example
+ * const logger = recordingLogger(); logger.at('info');
+ */
+function recordingLogger() {
+  const lines = [];
+  const record = (level) => (message) => lines.push({ level, message: String(message) });
+  return {
+    lines,
+    at: (level) => lines.filter((line) => line.level === level).map((line) => line.message),
+    debug: record('debug'),
+    info: record('info'),
+    warn: record('warn'),
+    error: record('error'),
+  };
+}
+
+/**
  * @description A clock the test moves by hand.
  * @param {number} start - The start, in ms.
  * @returns {Function} `() => ms`, with `.advance(ms)` and `.set(ms)`.
@@ -239,6 +259,7 @@ export {
   loadFixture,
   manualClock,
   metNoRoute,
+  recordingLogger,
   silentLogger,
   withNextHours,
 };

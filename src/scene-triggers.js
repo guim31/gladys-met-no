@@ -99,7 +99,7 @@ function createPrecipitationWatcher({
     states.set(house.id, { reading, lastFiredAt: now() });
     const data = buildEventData(house, reading, { language: getLanguage(), units: getUnits() });
     try {
-      logger.info(`Scene event ${SCENE_TRIGGERS.PRECIPITATION_EXPECTED} for "${house.name}"`);
+      logger.debug(`Scene event ${SCENE_TRIGGERS.PRECIPITATION_EXPECTED} for "${house.name}"`);
       await publish(SCENE_TRIGGERS.PRECIPITATION_EXPECTED, data);
     } catch (err) {
       // Refused (core too old, disconnected, rate limited): logged, never

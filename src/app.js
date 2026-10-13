@@ -26,6 +26,7 @@
 
 import { ERROR_KINDS } from './api.js';
 import { normalizeConfig } from './config.js';
+import { createFailureLog } from './failure-log.js';
 import { createForecastStore } from './forecast-store.js';
 import { createHouseRegistry } from './houses.js';
 import { buildWeather } from './pivot.js';
@@ -119,6 +120,7 @@ function createApp(
   let lastUnits = null;
   let lastSummary = null;
   let lastStatus = null;
+  const failures = createFailureLog(logger);
 
   const language = () => resolveLanguage(config.language, lastLanguage);
   const units = () => {
@@ -151,8 +153,10 @@ function createApp(
     try {
       await gladys.setConnectionStatus(status.connected, status.message);
       lastStatus = serialized;
+      failures.recover('status', 'The connection status is published again');
     } catch (err) {
-      logger.warn(`Unable to publish the connection status: ${err.message}`);
+      // Retried at every cycle: logged once while it lasts.
+      failures.fail('status', `Unable to publish the connection status: ${err.message}`);
     }
   }
 
@@ -168,7 +172,8 @@ function createApp(
     onCycle: async (summary) => {
       lastSummary = summary;
       watcher.forget(new Set(houses.list().map((house) => house.id)));
-      logger.info(
+      // Every cycle, every 30 minutes or so: debug, not info.
+      logger.debug(
         `Refreshed ${summary.refreshed} location(s) of ${summary.houses} house(s); next refresh in ${Math.round(summary.delayMs / 60000)} min`,
       );
       await publishStatus();

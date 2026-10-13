@@ -15,6 +15,8 @@
 // connection and at the start of every refresh cycle (a local call).
 // -----------------------------------------------------------------------------
 
+import { createFailureLog } from './failure-log.js';
+
 /**
  * @description Normalize a house name or selector for a lenient comparison.
  * @param {string} value - The value to normalize.
@@ -71,6 +73,8 @@ function houseMatches(house, wanted) {
 function createHouseRegistry({ fetchHouses, logger = console }) {
   // Located houses only: an unlocated house has no weather.
   let located = [];
+  // Read again at every cycle: a failure that lasts is logged once.
+  const failures = createFailureLog(logger);
 
   /**
    * @description Re-read the houses from Gladys. A failure keeps the previous
@@ -85,8 +89,9 @@ function createHouseRegistry({ fetchHouses, logger = console }) {
       located = (Array.isArray(houses) ? houses : []).filter(
         (house) => Number.isFinite(house?.latitude) && Number.isFinite(house?.longitude),
       );
+      failures.recover('houses', 'The houses of Gladys are readable again');
     } catch (err) {
-      logger.warn(`Unable to read the houses of Gladys: ${err.message}`);
+      failures.fail('houses', `Unable to read the houses of Gladys: ${err.message}`);
     }
     return located;
   }
